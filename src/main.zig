@@ -24,57 +24,77 @@ pub const SeqFlag = enum(u2) {
     Unsegmented = 3,
 };
 
+pub const CcsdsPrimaryRaw = packed struct {
+    control: u16,
+    sequence: u16,
+    length: u16,
+};
+
+pub fn OppositeEndian(endian: Endian) Endian {
+    switch (endian) {
+        Endian.Big => {
+            return Endian.Little;
+        },
+
+        Endian.Little => {
+            return Endian.Big;
+        },
+    }
+}
+
 pub fn CcsdsPrimaryGeneric(comptime endian: Endian) type {
     return packed struct {
-        control: packed union {
-            fields: packed struct {
-                apid: Apid,
-                secondary_header_flag: SecHeaderPresent = SecHeaderPresent.NotPresent,
-                packet_type: PacketType,
-                version: u3 = 0,
-            },
+        apid: Apid,
+        secondary_header_flag: SecHeaderPresent = SecHeaderPresent.NotPresent,
+        packet_type: PacketType,
+        version: u3 = 0,
 
-            raw: u16,
-        },
+        sequence: Sequence = 0,
+        seq_flag: SeqFlag = SeqFlag.Unsegmented,
 
-        sequence: packed union {
-            fields: packed struct {
-                sequence: Sequence = 0,
-                seq_flag: SeqFlag = SeqFlag.Unsegmented,
-            },
-
-            raw: u16,
-        },
-
-        length: u16,
+        length: u16 = 0,
 
         const Self = @This();
 
         pub fn new(apid: Apid, packet_type: PacketType) Self {
             var pri = Self{ .apid = apid, .packet_type = packet_type };
 
-            if (endian == builtin.endian) {
-                pri.f1 = f1;
-            } else {
-                pri.f1 = @byteSwap(u16, f1);
+            if (endian != builtin.endian) {
+                pri.byte_swap();
             }
 
             return pri;
         }
 
-        pub fn set_f1(self: Self, f1: u16) void {
+        pub fn byte_swap(self: *Self) void {
+            var raw = @ptrCast(*CcsdsPrimaryRaw, self);
+            raw.control = @byteSwap(raw.control);
+            raw.sequence = @byteSwap(raw.sequence);
+            raw.length = @byteSwap(raw.length);
+        }
+
+        pub fn swap_endianness(self: Self) CcsdsPrimaryGeneric(OppositeEndian(endian)) {
+            var swapped = @bitCast(CcsdsPrimaryGeneric(OppositeEndian(endian)), self);
+            swapped.byte_swap();
+            return swapped;
+        }
+
+        pub fn set_apid(self: *Self, apid: Apid) void {
             if (endian == builtin.endian) {
-                self.f1 = f1;
+                self.apid = apid;
             } else {
-                self.f1 = @byteSwap(u16, f1);
+                const swapped = self.swap_endianness();
+                swapped.apid = apid;
+                *self = swapped.swap_endianness();
             }
         }
 
-        pub fn get_f1(self: Self) u16 {
+        pub fn get_apid(self: Self) Apid {
             if (endian == builtin.endian) {
-                return self.f1;
+                return self.apid;
             } else {
-                return @byteSwap(u16, self.f1);
+                const swapped = self.swap_endianness();
+                return swapped.apid;
             }
         }
     };
