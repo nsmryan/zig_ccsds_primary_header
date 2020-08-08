@@ -3,6 +3,12 @@ const Endian = builtin.Endian;
 const std = @import("std");
 const testing = std.testing;
 
+pub const EndianInt = struct {
+    endian: Endian,
+};
+
+pub fn native_endian(typ: type, val: typ) typ {}
+
 pub const Apid = u11;
 
 pub const SecHeaderPresent = enum(u1) {
@@ -30,7 +36,7 @@ pub const CcsdsPrimaryRaw = packed struct {
     length: u16,
 };
 
-pub fn OppositeEndian(endian: Endian) Endian {
+pub fn OppositeEndian(comptime endian: Endian) Endian {
     switch (endian) {
         Endian.Big => {
             return Endian.Little;
@@ -68,14 +74,17 @@ pub fn CcsdsPrimaryGeneric(comptime endian: Endian) type {
 
         pub fn byte_swap(self: *Self) void {
             var raw = @ptrCast(*CcsdsPrimaryRaw, self);
-            raw.control = @byteSwap(raw.control);
-            raw.sequence = @byteSwap(raw.sequence);
-            raw.length = @byteSwap(raw.length);
+            raw.control = @byteSwap(u16, raw.control);
+            raw.sequence = @byteSwap(u16, raw.sequence);
+            raw.length = @byteSwap(u16, raw.length);
         }
 
         pub fn swap_endianness(self: Self) CcsdsPrimaryGeneric(OppositeEndian(endian)) {
-            var swapped = @bitCast(CcsdsPrimaryGeneric(OppositeEndian(endian)), self);
+            comptime const opposite_endian = OppositeEndian(endian);
+
+            var swapped = @bitCast(CcsdsPrimaryGeneric(opposite_endian), self);
             swapped.byte_swap();
+
             return swapped;
         }
 
@@ -104,20 +113,20 @@ const CcsdsPrimary = CcsdsPrimaryGeneric(Endian.Big);
 const CcsdsPrimaryNative = CcsdsPrimaryGeneric(builtin.endian);
 
 test "big endian primary header" {
-    const val = 0x0012;
-    const val_raw = 0x1200;
-    const pri = CcsdsPrimary.new(val);
+    const apid = 0x0012;
+    const apid_raw = 0x1200;
+    const pri = CcsdsPrimary.new(apid, PacketType.Data);
 
-    testing.expect(val == pri.get_f1());
+    testing.expect(apid == pri.get_apid());
 
     const stderr = std.io.getStdErr().writer();
-    testing.expect(val_raw == pri.f1);
+    testing.expect(apid_raw == pri.apid);
 }
 
 test "little endian primary header" {
-    const val = 0x12;
-    const val_raw = 0x0012;
-    const pri = CcsdsPrimaryNative.new(val);
-    testing.expect(val == pri.get_f1());
-    testing.expect(val_raw == pri.f1);
+    const apid = 0x12;
+    const apid_raw = 0x0012;
+    const pri = CcsdsPrimaryNative.new(apid, PacketType.Data);
+    testing.expect(apid == pri.get_apid());
+    testing.expect(apid_raw == pri.apid);
 }
