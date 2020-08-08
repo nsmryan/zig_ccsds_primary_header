@@ -77,32 +77,32 @@ pub const CcsdsPrimary = packed struct {
     // NOTE consider a function that takes the type, casts, swaps, and casts back.
     // NOTE byteSwap apparently works with vectors, so perhaps can cast any object to bytes and still swap
     pub fn set_apid(self: *Self, apid: Apid) void {
-        var swapped = @bitCast(CcsdsControl, @byteSwap(u16, @bitCast(u16, self.control)));
-        swapped.apid = apid;
-        self.control = @bitCast(CcsdsControl, @byteSwap(u16, @bitCast(u16, swapped)));
+        self.control = set_field_swapped(u16, CcsdsControl, self.control, "apid", apid);
     }
 
     pub fn get_apid(self: Self) Apid {
-        const swapped = @bitCast(CcsdsControl, @byteSwap(u16, @bitCast(u16, self.control)));
-        return swapped.apid;
+        return get_field_swapped(u16, Apid, self.control, "apid");
     }
 };
 
-pub fn set_field_swapped(comptime T: type, value: anytype, field_name: []const u8, field_val: anytype) anytype {
-    var swapped = @bitCast(@TypeOf(value), @byteSwap(T, @bitCast(T, @field(value, field_name))));
+pub fn set_field_swapped(comptime T: type, comptime V: type, value: V, comptime field_name: []const u8, field_value: anytype) V {
+    var swapped = @bitCast(V, @byteSwap(T, @bitCast(T, value)));
     @field(swapped, field_name) = field_value;
-    return @bitCast(@TypeOf(value), @byteSwap(T, @bitCast(T, swapped)));
+    return @bitCast(V, @byteSwap(T, @bitCast(T, swapped)));
 }
 
-pub fn get_field_swapped(comptime T: type, value: anytype, field_name: []const u8) anytype {
-    const swapped = @bitCast(CcsdsControl, @byteSwap(u16, @bitCast(u16, self.control)));
-    return swapped.apid;
+pub fn get_field_swapped(comptime T: type, comptime FieldType: type, value: anytype, comptime field_name: []const u8) FieldType {
+    const swapped = @bitCast(@TypeOf(value), @byteSwap(T, @bitCast(T, value)));
+    return @field(swapped, field_name);
 }
 
 test "primary header" {
-    const apid = 0x0012;
-    const apid_raw = 0x1200;
-    const pri = CcsdsPrimary.new(apid, PacketType.Data);
+    const apid: Apid = 0x0012;
+    const apid2: Apid = 0x200;
+    var pri = CcsdsPrimary.new(apid, PacketType.Data);
 
     assert(pri.get_apid() == apid);
+
+    pri.set_apid(apid2);
+    assert(pri.get_apid() == apid2);
 }
