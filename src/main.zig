@@ -115,31 +115,31 @@ pub const CcsdsLength = packed struct {
 };
 
 pub const CcsdsPrimary = packed struct {
-    control: EndianWrapped(CcsdsControl, Endian.Big),
-    sequence: EndianWrapped(CcsdsSequence, Endian.Big),
-    length: EndianWrapped(CcsdsLength, Endian.Big),
+    control: CcsdsControl,
+    sequence: CcsdsSequence,
+    length: CcsdsLength,
 
     const Self = @This();
 
     pub fn new(apid: Apid, packet_type: PacketType) Self {
         var pri = Self{
-            .control = EndianWrapped(CcsdsControl, Endian.Big).new(CcsdsControl.new(apid, packet_type)),
-            .sequence = EndianWrapped(CcsdsSequence, Endian.Big).new(CcsdsSequence.new()),
-            .length = EndianWrapped(CcsdsLength, Endian.Big).new(CcsdsLength.new()),
+            .control = CcsdsControl.new(apid, packet_type),
+            .sequence = CcsdsSequence.new(),
+            .length = CcsdsLength.new(),
         };
 
         return pri;
     }
 
     pub fn set_apid(self: *Self, apid: Apid) void {
-        var swapped = self.control.swap();
-        swapped.val.apid = apid;
-        self.control = swapped.swap();
+        var swapped = generic_swap(CcsdsControl, self.control);
+        swapped.apid = apid;
+        self.control = generic_swap(CcsdsControl, swapped);
     }
 
     pub fn get_apid(self: Self) Apid {
-        const swapped = self.control.swap();
-        return swapped.val.apid;
+        const swapped = generic_swap(self.control);
+        return swapped.apid;
     }
 };
 
