@@ -101,6 +101,8 @@ test "primary header" {
     const apid2: Apid = 0x200;
     var pri = CcsdsPrimary.new(apid, PacketType.Data);
 
+    assert(@sizeOf(CcsdsPrimary) == 6);
+
     assert(pri.get_apid() == apid);
 
     pri.set_apid(apid2);
