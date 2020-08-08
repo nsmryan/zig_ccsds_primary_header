@@ -2,12 +2,26 @@ const builtin = @import("builtin");
 const Endian = builtin.Endian;
 const std = @import("std");
 const testing = std.testing;
+const assert = std.debug.assert;
 
-pub const EndianInt = struct {
-    endian: Endian,
-};
+pub fn EndianWrapped(comptime typ: type, comptime endian: Endian) type {
+    return packed struct {
+        val: typ,
 
-pub fn native_endian(typ: type, val: typ) typ {}
+        const Self = @This();
+
+        pub fn new(val: typ) Self {
+            return Self{ .val = val };
+        }
+
+        pub fn swap(self: Self) EndianWrapped(type, opposite_endian(endian)) {
+            const swapped_val = generic_swap(typ, self.val);
+
+            const swapped = EndianWrapped(type, opposite_endian(endian)).new(swapped);
+            return swapped;
+        }
+    };
+}
 
 pub const Apid = u11;
 
@@ -36,7 +50,7 @@ pub const CcsdsPrimaryRaw = packed struct {
     length: u16,
 };
 
-pub fn OppositeEndian(comptime endian: Endian) Endian {
+pub fn opposite_endian(endian: Endian) Endian {
     switch (endian) {
         Endian.Big => {
             return Endian.Little;
@@ -48,85 +62,91 @@ pub fn OppositeEndian(comptime endian: Endian) Endian {
     }
 }
 
-pub fn CcsdsPrimaryGeneric(comptime endian: Endian) type {
-    return packed struct {
-        apid: Apid,
-        secondary_header_flag: SecHeaderPresent = SecHeaderPresent.NotPresent,
-        packet_type: PacketType,
-        version: u3 = 0,
+pub fn generic_swap(comptime T: type, val: T) T {
+    comptime const num_bits = @bitSizeOf(T);
 
-        sequence: Sequence = 0,
-        seq_flag: SeqFlag = SeqFlag.Unsegmented,
+    if (num_bits == 0) {
+        @panic("0 bit size may indicate comptime type. This function does not make sense at comptime");
+    }
 
-        length: u16 = 0,
+    if (num_bits % 8 != 0) {
+        @panic("Swapping a type that is not bit-aligned does not make sense!");
+    }
 
-        const Self = @This();
+    comptime const num_bytes = num_bits / 8;
 
-        pub fn new(apid: Apid, packet_type: PacketType) Self {
-            var pri = Self{ .apid = apid, .packet_type = packet_type };
-
-            if (endian != builtin.endian) {
-                pri.byte_swap();
-            }
-
-            return pri;
-        }
-
-        pub fn byte_swap(self: *Self) void {
-            var raw = @ptrCast(*CcsdsPrimaryRaw, self);
-            raw.control = @byteSwap(u16, raw.control);
-            raw.sequence = @byteSwap(u16, raw.sequence);
-            raw.length = @byteSwap(u16, raw.length);
-        }
-
-        pub fn swap_endianness(self: Self) CcsdsPrimaryGeneric(OppositeEndian(endian)) {
-            comptime const opposite_endian = OppositeEndian(endian);
-
-            var swapped = @bitCast(CcsdsPrimaryGeneric(opposite_endian), self);
-            swapped.byte_swap();
-
-            return swapped;
-        }
-
-        pub fn set_apid(self: *Self, apid: Apid) void {
-            if (endian == builtin.endian) {
-                self.apid = apid;
-            } else {
-                const swapped = self.swap_endianness();
-                swapped.apid = apid;
-                *self = swapped.swap_endianness();
-            }
-        }
-
-        pub fn get_apid(self: Self) Apid {
-            if (endian == builtin.endian) {
-                return self.apid;
-            } else {
-                const swapped = self.swap_endianness();
-                return swapped.apid;
-            }
-        }
-    };
+    // NOTE consider using inline
+    var bytes = @bitCast([num_bytes]u8, val);
+    const mid_byte_index = num_bytes / 2;
+    var index = 0;
+    while (index < mid_byte_index) {
+        const tmp = bytes[index];
+        bytes[index] = bytes[num_bytes - index];
+        bytes[num_bytes - index] = tmp;
+    }
 }
 
-const CcsdsPrimary = CcsdsPrimaryGeneric(Endian.Big);
-const CcsdsPrimaryNative = CcsdsPrimaryGeneric(builtin.endian);
+pub const CcsdsControl = packed struct {
+    apid: Apid,
+    secondary_header_flag: SecHeaderPresent = SecHeaderPresent.NotPresent,
+    packet_type: PacketType,
+    version: u3 = 0,
 
-test "big endian primary header" {
+    pub fn new(apid: Apid, packet_type: PacketType) CcsdsControl {
+        return CcsdsControl{ .apid = apid, .packet_type = packet_type };
+    }
+};
+
+pub const CcsdsSequence = packed struct {
+    sequence: Sequence = 0,
+    seq_flag: SeqFlag = SeqFlag.Unsegmented,
+
+    pub fn new() CcsdsSequence {
+        return CcsdsSequence{};
+    }
+};
+
+pub const CcsdsLength = packed struct {
+    length: u16 = 0,
+
+    pub fn new() CcsdsLength {
+        return CcsdsLength{};
+    }
+};
+
+pub const CcsdsPrimary = packed struct {
+    control: EndianWrapped(CcsdsControl, Endian.Big),
+    sequence: EndianWrapped(CcsdsSequence, Endian.Big),
+    length: EndianWrapped(CcsdsLength, Endian.Big),
+
+    const Self = @This();
+
+    pub fn new(apid: Apid, packet_type: PacketType) Self {
+        var pri = Self{
+            .control = EndianWrapped(CcsdsControl, Endian.Big).new(CcsdsControl.new(apid, packet_type)),
+            .sequence = EndianWrapped(CcsdsSequence, Endian.Big).new(CcsdsSequence.new()),
+            .length = EndianWrapped(CcsdsLength, Endian.Big).new(CcsdsLength.new()),
+        };
+
+        return pri;
+    }
+
+    pub fn set_apid(self: *Self, apid: Apid) void {
+        var swapped = self.control.swap();
+        swapped.val.apid = apid;
+        self.control = swapped.swap();
+    }
+
+    pub fn get_apid(self: Self) Apid {
+        const swapped = self.control.swap();
+        return swapped.val.apid;
+    }
+};
+
+test "primary header" {
     const apid = 0x0012;
     const apid_raw = 0x1200;
     const pri = CcsdsPrimary.new(apid, PacketType.Data);
 
-    testing.expect(apid == pri.get_apid());
-
-    const stderr = std.io.getStdErr().writer();
-    testing.expect(apid_raw == pri.apid);
-}
-
-test "little endian primary header" {
-    const apid = 0x12;
-    const apid_raw = 0x0012;
-    const pri = CcsdsPrimaryNative.new(apid, PacketType.Data);
-    testing.expect(apid == pri.get_apid());
-    testing.expect(apid_raw == pri.apid);
+    assert(pri.get_apid() == 0x0012);
 }
