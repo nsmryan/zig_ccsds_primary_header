@@ -88,6 +88,17 @@ pub const CcsdsPrimary = packed struct {
     }
 };
 
+pub fn set_field_swapped(comptime T: type, value: anytype, field_name: []const u8, field_val: anytype) anytype {
+    var swapped = @bitCast(@TypeOf(value), @byteSwap(T, @bitCast(T, @field(value, field_name))));
+    @field(swapped, field_name) = field_value;
+    return @bitCast(@TypeOf(value), @byteSwap(T, @bitCast(T, swapped)));
+}
+
+pub fn get_field_swapped(comptime T: type, value: anytype, field_name: []const u8) anytype {
+    const swapped = @bitCast(CcsdsControl, @byteSwap(u16, @bitCast(u16, self.control)));
+    return swapped.apid;
+}
+
 test "primary header" {
     const apid = 0x0012;
     const apid_raw = 0x1200;
