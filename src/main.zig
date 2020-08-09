@@ -162,6 +162,7 @@ pub const CcsdsPrimary = packed struct {
 };
 
 // NOTE these generic functions could infer return types, but this is not implemented in Zig yet
+// NOTE these might not need the T input, using byte array might work instead.
 pub fn set_field_swapped(comptime T: type, comptime ValueType: type, value: *ValueType, comptime field_name: []const u8, field_value: anytype) void {
     var swapped = @bitCast(ValueType, @byteSwap(T, @bitCast(T, value.*)));
     @field(swapped, field_name) = field_value;
