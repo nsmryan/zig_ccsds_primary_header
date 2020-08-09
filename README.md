@@ -104,12 +104,13 @@ describe integers that are not powers of two.
 
 ### Rust
 Rust has a number of possible solutions- it does not currently have bitfields,
-although perhaps it may in the future, but the C solution works just as well in
-Rust, and there are other solutions, if you are willing to accept libraries
-which provide macros that extend the Rust language.
+although perhaps it may in the future, so we have to create the same effect
+through other means. The C solution works just as well in Rust as in C, and
+there are other solutions if you are willing to accept libraries which provide
+macros that extend the Rust language.
 
 
-There are a number of these libraries. However, some of them seem to do
+There are a number of these macro libraries. However, some of them seem to do
 serialization/deserialization, and all of them require your types to be defined
 within the macro context. I would much prefer a language that allows me to do
 this kind of thing without this kind of extension.  This is a complex topic,
