@@ -89,12 +89,11 @@ form within a byte buffer, and copy deserialized and manipulated).
 
 
 ### C
-To accomplish this in C (and in Rust, if avoiding macro libraries)
-we have to keep the data as byte pairs, construct a 16 bit unsigned integer
-out of them (this keeps the layout fixed and works on both big and little
-endian systems). We can then do the bit mask and shift operations to
-extract the correct bits, and then the opposite mask/shift/OR operations
-to place bits within these 16-bit words. This is error prone, but it
+To accomplish this in C we have to keep the data as byte pairs and construct a
+16 bit unsigned integer out of them (this keeps the layout fixed and works on
+both big and little endian systems). We can then do the bit mask and shift
+operations to extract the correct bits, and then the opposite mask/shift/OR
+operations to place bits within these 16-bit words. This is error prone, but it
 does work, its cross platform, and its preferrable to C bitfields.
 
 
