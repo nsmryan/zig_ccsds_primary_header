@@ -10,6 +10,18 @@ performs very well, and this is my preferred encoding compared to similar
 libraries I've written in those languages.
 
 
+This library contains a potential solution for bit field definitions
+which pack in the opposite order from Zig bit fields. This should be
+generally applicable when faced with this problem- essentially
+you break the bitfield into separate structures along byte-aligned
+sequences of fields, swap their order in the definition, and then
+byte swap before and after accessing their fields.
+
+
+I would be interested in other solutions- this repository establishes
+that at least this solution works, but better ones likely exist.
+
+
 ## Primary Header Layout
 The CCSDS Primary Header is a simple binary packet header containing
 three sections, each of which is two bytes, which is referred to as a 'word':
